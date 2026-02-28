@@ -5,6 +5,7 @@ var player_units: Array[BattleUnit] = []
 var enemy_units: Array[BattleUnit] = []
 var selected_skill: SkillData = null
 var selecting_target: bool = false
+var char_renderers: Dictionary = {}  # unit_name -> CharacterRenderer
 
 func _ready():
 	battle_manager = $BattleManager
@@ -30,7 +31,7 @@ func _setup_battle():
 		SkillData.create("万剑归宗", "剑雨攻击全体敌人", 25, 15, SkillData.TargetType.ALL_ENEMIES, SkillData.DamageType.MAGICAL),
 		SkillData.create("聚灵诀", "恢复自身生命", 15, 30, SkillData.TargetType.SELF, SkillData.DamageType.HEAL),
 	]
-	
+
 	var player2 = BattleUnit.new()
 	player2.unit_name = "丹修·灵溪"
 	player2.is_player = true
@@ -44,9 +45,9 @@ func _setup_battle():
 		SkillData.create("天火焚原", "烈焰焚烧全体敌人", 30, 20, SkillData.TargetType.ALL_ENEMIES, SkillData.DamageType.MAGICAL),
 		SkillData.create("回春术", "恢复自身生命", 18, 40, SkillData.TargetType.SELF, SkillData.DamageType.HEAL),
 	]
-	
+
 	player_units = [player1, player2]
-	
+
 	# Create enemies
 	var enemy1 = BattleUnit.new()
 	enemy1.unit_name = "妖狼"
@@ -55,7 +56,7 @@ func _setup_battle():
 	enemy1.max_mp = 20; enemy1.mp = 20
 	enemy1.attack = 15; enemy1.defense = 5
 	enemy1.agility = 65; enemy1.spirit = 5
-	
+
 	var enemy2 = BattleUnit.new()
 	enemy2.unit_name = "毒蛇精"
 	enemy2.is_player = false
@@ -63,7 +64,7 @@ func _setup_battle():
 	enemy2.max_mp = 30; enemy2.mp = 30
 	enemy2.attack = 18; enemy2.defense = 3
 	enemy2.agility = 80; enemy2.spirit = 12
-	
+
 	var enemy3 = BattleUnit.new()
 	enemy3.unit_name = "石魔"
 	enemy3.is_player = false
@@ -71,11 +72,54 @@ func _setup_battle():
 	enemy3.max_mp = 10; enemy3.mp = 10
 	enemy3.attack = 22; enemy3.defense = 15
 	enemy3.agility = 30; enemy3.spirit = 3
-	
+
 	enemy_units = [enemy1, enemy2, enemy3]
-	
+
+	# Create character renderers on the battlefield
+	_spawn_character_sprites()
+
 	battle_manager.start_battle(player_units, enemy_units)
 	_update_all_ui()
+
+func _spawn_character_sprites():
+	var battlefield = $BattleField/CharacterLayer
+	
+	# Player characters (left side)
+	var p1_renderer = CharacterRenderer.new()
+	p1_renderer.char_type = CharacterRenderer.CharType.SWORD_CULTIVATOR
+	p1_renderer.facing_left = false
+	p1_renderer.position = Vector2(250, 380)
+	battlefield.add_child(p1_renderer)
+	char_renderers["剑修·云逸"] = p1_renderer
+	
+	var p2_renderer = CharacterRenderer.new()
+	p2_renderer.char_type = CharacterRenderer.CharType.DAN_CULTIVATOR
+	p2_renderer.facing_left = false
+	p2_renderer.position = Vector2(150, 420)
+	battlefield.add_child(p2_renderer)
+	char_renderers["丹修·灵溪"] = p2_renderer
+	
+	# Enemy characters (right side)
+	var e1_renderer = CharacterRenderer.new()
+	e1_renderer.char_type = CharacterRenderer.CharType.WOLF_MONSTER
+	e1_renderer.facing_left = true
+	e1_renderer.position = Vector2(800, 370)
+	battlefield.add_child(e1_renderer)
+	char_renderers["妖狼"] = e1_renderer
+	
+	var e2_renderer = CharacterRenderer.new()
+	e2_renderer.char_type = CharacterRenderer.CharType.SNAKE_MONSTER
+	e2_renderer.facing_left = true
+	e2_renderer.position = Vector2(920, 400)
+	battlefield.add_child(e2_renderer)
+	char_renderers["毒蛇精"] = e2_renderer
+	
+	var e3_renderer = CharacterRenderer.new()
+	e3_renderer.char_type = CharacterRenderer.CharType.GOLEM_MONSTER
+	e3_renderer.facing_left = true
+	e3_renderer.position = Vector2(1040, 360)
+	battlefield.add_child(e3_renderer)
+	char_renderers["石魔"] = e3_renderer
 
 func _update_all_ui():
 	_update_player_panels()
@@ -85,7 +129,7 @@ func _update_all_ui():
 func _update_player_panels():
 	for i in range(player_units.size()):
 		var u = player_units[i]
-		var panel = get_node_or_null("BattleField/PlayerSide/Player%d" % (i + 1))
+		var panel = get_node_or_null("UI/TopBar/PlayerSide/Player%d" % (i + 1))
 		if panel:
 			panel.get_node("Name").text = u.unit_name
 			panel.get_node("Realm").text = u.realm
@@ -98,7 +142,7 @@ func _update_player_panels():
 func _update_enemy_panels():
 	for i in range(enemy_units.size()):
 		var u = enemy_units[i]
-		var panel = get_node_or_null("BattleField/EnemySide/Enemy%d" % (i + 1))
+		var panel = get_node_or_null("UI/TopBar/EnemySide/Enemy%d" % (i + 1))
 		if panel:
 			panel.get_node("Name").text = u.unit_name
 			panel.get_node("HP").text = "HP: %d/%d" % [u.hp, u.max_hp]
@@ -107,47 +151,47 @@ func _update_enemy_panels():
 
 func _update_atb_bars():
 	for i in range(player_units.size()):
-		var bar = get_node_or_null("ATBPanel/ATB_P%d/Bar" % (i + 1))
-		var label = get_node_or_null("ATBPanel/ATB_P%d/Label" % (i + 1))
+		var bar = get_node_or_null("UI/ATBPanel/ATB_P%d/Bar" % (i + 1))
+		var label = get_node_or_null("UI/ATBPanel/ATB_P%d/Label" % (i + 1))
 		if bar and label:
 			bar.value = player_units[i].atb
 			label.text = player_units[i].unit_name
 	for i in range(enemy_units.size()):
-		var bar = get_node_or_null("ATBPanel/ATB_E%d/Bar" % (i + 1))
-		var label = get_node_or_null("ATBPanel/ATB_E%d/Label" % (i + 1))
+		var bar = get_node_or_null("UI/ATBPanel/ATB_E%d/Bar" % (i + 1))
+		var label = get_node_or_null("UI/ATBPanel/ATB_E%d/Label" % (i + 1))
 		if bar and label:
 			bar.value = enemy_units[i].atb
 			label.text = enemy_units[i].unit_name
 
 func _on_unit_ready(unit: BattleUnit):
 	_update_all_ui()
-	# Show action buttons
-	$ActionPanel.visible = true
-	$ActionPanel/UnitLabel.text = "【%s 的回合】" % unit.unit_name
-	$TargetPanel.visible = false
+	# Highlight active character
+	if char_renderers.has(unit.unit_name):
+		char_renderers[unit.unit_name].has_aura = true
+	
+	$UI/ActionPanel.visible = true
+	$UI/ActionPanel/UnitLabel.text = "【%s 的回合】" % unit.unit_name
+	$UI/TargetPanel.visible = false
 	selected_skill = null
 	selecting_target = false
-	
-	# Setup skill buttons
+
 	for i in range(3):
-		var btn = $ActionPanel/Skills.get_node_or_null("Skill%d" % (i + 1))
+		var btn = $UI/ActionPanel/Skills.get_node_or_null("Skill%d" % (i + 1))
 		if btn:
 			if i < unit.skills.size():
 				var sk = unit.skills[i]
 				btn.text = "%s (MP:%d)" % [sk.skill_name, sk.mp_cost]
 				btn.visible = true
 				btn.disabled = unit.mp < sk.mp_cost
-				# Disconnect old signals
 				if btn.pressed.is_connected(_on_skill_pressed):
 					btn.pressed.disconnect(_on_skill_pressed)
 				btn.pressed.connect(_on_skill_pressed.bind(i))
 			else:
 				btn.visible = false
-	
-	# Attack button
-	if $ActionPanel/AttackBtn.pressed.is_connected(_on_attack):
-		$ActionPanel/AttackBtn.pressed.disconnect(_on_attack)
-	$ActionPanel/AttackBtn.pressed.connect(_on_attack)
+
+	if $UI/ActionPanel/AttackBtn.pressed.is_connected(_on_attack):
+		$UI/ActionPanel/AttackBtn.pressed.disconnect(_on_attack)
+	$UI/ActionPanel/AttackBtn.pressed.connect(_on_attack)
 
 func _on_attack():
 	selected_skill = null
@@ -158,56 +202,81 @@ func _on_skill_pressed(idx: int):
 	if idx < unit.skills.size():
 		selected_skill = unit.skills[idx]
 		if selected_skill.target_type == SkillData.TargetType.SELF:
+			_play_action_anim(unit, unit, selected_skill)
 			battle_manager.execute_skill(unit, selected_skill, unit)
-			$ActionPanel.visible = false
+			$UI/ActionPanel.visible = false
 			_update_all_ui()
 		elif selected_skill.target_type == SkillData.TargetType.ALL_ENEMIES:
 			var enemies = enemy_units.filter(func(u): return not u.is_dead)
 			if not enemies.is_empty():
+				_play_action_anim(unit, enemies[0], selected_skill)
+				for e in enemies:
+					if char_renderers.has(e.unit_name):
+						char_renderers[e.unit_name].play_hit()
 				battle_manager.execute_skill(unit, selected_skill, enemies[0])
-			$ActionPanel.visible = false
+			$UI/ActionPanel.visible = false
 			_update_all_ui()
 		else:
 			_show_target_selection()
 
 func _show_target_selection():
-	$ActionPanel.visible = false
-	$TargetPanel.visible = true
+	$UI/ActionPanel.visible = false
+	$UI/TargetPanel.visible = true
 	selecting_target = true
-	
-	# Create target buttons
-	for child in $TargetPanel/Targets.get_children():
+
+	for child in $UI/TargetPanel/Targets.get_children():
 		child.queue_free()
-	
+
 	var alive_enemies = enemy_units.filter(func(u): return not u.is_dead)
 	for i in range(alive_enemies.size()):
 		var btn = Button.new()
 		btn.text = "%s (HP:%d/%d)" % [alive_enemies[i].unit_name, alive_enemies[i].hp, alive_enemies[i].max_hp]
 		btn.custom_minimum_size = Vector2(250, 40)
 		btn.pressed.connect(_on_target_selected.bind(alive_enemies[i]))
-		$TargetPanel/Targets.add_child(btn)
+		$UI/TargetPanel/Targets.add_child(btn)
 
 func _on_target_selected(target: BattleUnit):
-	$TargetPanel.visible = false
+	$UI/TargetPanel.visible = false
 	selecting_target = false
 	var unit = battle_manager.current_unit
+	
+	# Play animations
+	_play_action_anim(unit, target, selected_skill)
+	
 	if selected_skill:
 		battle_manager.execute_skill(unit, selected_skill, target)
 	else:
 		battle_manager.execute_attack(unit, target)
 	_update_all_ui()
 
+func _play_action_anim(attacker: BattleUnit, target: BattleUnit, skill: SkillData):
+	# Attacker animation
+	if char_renderers.has(attacker.unit_name):
+		char_renderers[attacker.unit_name].play_attack()
+	
+	# Target animation (after small delay)
+	await get_tree().create_timer(0.2).timeout
+	if char_renderers.has(target.unit_name):
+		if target.is_dead:
+			char_renderers[target.unit_name].play_defeated()
+		else:
+			char_renderers[target.unit_name].play_hit()
+
 func _on_battle_log(text: String):
-	$LogPanel/Log.text += text + "\n"
-	# Auto scroll
+	$UI/LogPanel/Log.text += text + "\n"
 	await get_tree().process_frame
-	$LogPanel/Log.scroll_vertical = $LogPanel/Log.get_v_scroll_bar().max_value
+	$UI/LogPanel/Log.scroll_vertical = $UI/LogPanel/Log.get_v_scroll_bar().max_value
+	
+	# Check for defeated units and update sprites
+	for u in player_units + enemy_units:
+		if u.is_dead and char_renderers.has(u.unit_name):
+			if char_renderers[u.unit_name].current_pose != CharacterRenderer.Pose.DEFEATED:
+				char_renderers[u.unit_name].play_defeated()
 
 func _on_battle_ended(won: bool):
-	$ActionPanel.visible = false
-	$TargetPanel.visible = false
-	# Show result
-	var result = $ResultPanel
+	$UI/ActionPanel.visible = false
+	$UI/TargetPanel.visible = false
+	var result = $UI/ResultPanel
 	result.visible = true
 	result.get_node("ResultLabel").text = "🎉 战斗胜利！获得修为 +50" if won else "💀 道消身陨..."
 	result.get_node("ReturnBtn").pressed.connect(func():
