@@ -5,7 +5,7 @@ var player_units: Array[BattleUnit] = []
 var enemy_units: Array[BattleUnit] = []
 var selected_skill: SkillData = null
 var selecting_target: bool = false
-var char_renderers: Dictionary = {}  # unit_name -> CharacterRenderer
+var char_sprites: Dictionary = {}  # unit_name -> Sprite2D
 
 func _ready():
 	battle_manager = $BattleManager
@@ -13,7 +13,6 @@ func _ready():
 	battle_manager.battle_log.connect(_on_battle_log)
 	battle_manager.battle_ended.connect(_on_battle_ended)
 	battle_manager.atb_updated.connect(_update_atb_bars)
-	
 	_setup_battle()
 
 func _setup_battle():
@@ -48,7 +47,6 @@ func _setup_battle():
 
 	player_units = [player1, player2]
 
-	# Create enemies
 	var enemy1 = BattleUnit.new()
 	enemy1.unit_name = "妖狼"
 	enemy1.is_player = false
@@ -74,52 +72,98 @@ func _setup_battle():
 	enemy3.agility = 30; enemy3.spirit = 3
 
 	enemy_units = [enemy1, enemy2, enemy3]
-
-	# Create character renderers on the battlefield
-	_spawn_character_sprites()
-
+	_spawn_sprites()
 	battle_manager.start_battle(player_units, enemy_units)
 	_update_all_ui()
 
-func _spawn_character_sprites():
-	var battlefield = $BattleField/CharacterLayer
+func _spawn_sprites():
+	var layer = $BattleField/CharacterLayer
 	
-	# Player characters (left side)
-	var p1_renderer = CharacterRenderer.new()
-	p1_renderer.char_type = CharacterRenderer.CharType.SWORD_CULTIVATOR
-	p1_renderer.facing_left = false
-	p1_renderer.position = Vector2(250, 380)
-	battlefield.add_child(p1_renderer)
-	char_renderers["剑修·云逸"] = p1_renderer
+	# Sprite configs: name, texture path, position, scale, flip
+	var configs = [
+		["剑修·云逸", "res://assets/sprites/sword_cultivator.png", Vector2(220, 420), 0.22, false],
+		["丹修·灵溪", "res://assets/sprites/dan_cultivator.png", Vector2(100, 440), 0.20, false],
+		["妖狼", "res://assets/sprites/wolf_monster.png", Vector2(780, 410), 0.22, true],
+		["毒蛇精", "res://assets/sprites/snake_spirit.png", Vector2(930, 420), 0.20, true],
+		["石魔", "res://assets/sprites/stone_golem.png", Vector2(1080, 380), 0.28, true],
+	]
 	
-	var p2_renderer = CharacterRenderer.new()
-	p2_renderer.char_type = CharacterRenderer.CharType.DAN_CULTIVATOR
-	p2_renderer.facing_left = false
-	p2_renderer.position = Vector2(150, 420)
-	battlefield.add_child(p2_renderer)
-	char_renderers["丹修·灵溪"] = p2_renderer
+	for cfg in configs:
+		var sprite = Sprite2D.new()
+		sprite.name = cfg[0]
+		var tex = load(cfg[1])
+		if tex:
+			sprite.texture = tex
+		sprite.position = cfg[2]
+		sprite.scale = Vector2(cfg[3], cfg[3])
+		if cfg[4]:
+			sprite.flip_h = true
+		# Idle breathing animation
+		var tween = create_tween().set_loops()
+		tween.tween_property(sprite, "position:y", cfg[2].y - 5, 1.0).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+		tween.tween_property(sprite, "position:y", cfg[2].y + 5, 1.0).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+		
+		layer.add_child(sprite)
+		char_sprites[cfg[0]] = sprite
+
+func _play_attack_anim(attacker_name: String, target_name: String):
+	var attacker = char_sprites.get(attacker_name)
+	var target = char_sprites.get(target_name)
+	if not attacker or not target:
+		return
 	
-	# Enemy characters (right side)
-	var e1_renderer = CharacterRenderer.new()
-	e1_renderer.char_type = CharacterRenderer.CharType.WOLF_MONSTER
-	e1_renderer.facing_left = true
-	e1_renderer.position = Vector2(800, 370)
-	battlefield.add_child(e1_renderer)
-	char_renderers["妖狼"] = e1_renderer
+	var original_pos = attacker.position
+	var dir = (target.position - attacker.position).normalized()
+	var lunge_pos = original_pos + dir * 60
 	
-	var e2_renderer = CharacterRenderer.new()
-	e2_renderer.char_type = CharacterRenderer.CharType.SNAKE_MONSTER
-	e2_renderer.facing_left = true
-	e2_renderer.position = Vector2(920, 400)
-	battlefield.add_child(e2_renderer)
-	char_renderers["毒蛇精"] = e2_renderer
+	# Lunge forward
+	var tween = create_tween()
+	tween.tween_property(attacker, "position", lunge_pos, 0.15).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	tween.tween_callback(_play_hit_anim.bind(target_name))
+	tween.tween_property(attacker, "position", original_pos, 0.3).set_ease(Tween.EASE_IN_OUT)
+
+func _play_hit_anim(target_name: String):
+	var target = char_sprites.get(target_name)
+	if not target:
+		return
 	
-	var e3_renderer = CharacterRenderer.new()
-	e3_renderer.char_type = CharacterRenderer.CharType.GOLEM_MONSTER
-	e3_renderer.facing_left = true
-	e3_renderer.position = Vector2(1040, 360)
-	battlefield.add_child(e3_renderer)
-	char_renderers["石魔"] = e3_renderer
+	# Flash red and shake
+	var tween = create_tween()
+	tween.tween_property(target, "modulate", Color(1.5, 0.3, 0.3), 0.05)
+	tween.tween_property(target, "position:x", target.position.x + 15, 0.05)
+	tween.tween_property(target, "position:x", target.position.x - 15, 0.05)
+	tween.tween_property(target, "position:x", target.position.x + 8, 0.05)
+	tween.tween_property(target, "position:x", target.position.x, 0.05)
+	tween.tween_property(target, "modulate", Color.WHITE, 0.2)
+
+func _play_defeated_anim(unit_name: String):
+	var sprite = char_sprites.get(unit_name)
+	if not sprite:
+		return
+	var tween = create_tween()
+	tween.tween_property(sprite, "modulate:a", 0.3, 0.5)
+	tween.parallel().tween_property(sprite, "rotation", deg_to_rad(90), 0.5)
+	tween.parallel().tween_property(sprite, "position:y", sprite.position.y + 30, 0.5)
+
+func _play_heal_anim(unit_name: String):
+	var sprite = char_sprites.get(unit_name)
+	if not sprite:
+		return
+	var tween = create_tween()
+	tween.tween_property(sprite, "modulate", Color(0.5, 1.5, 0.5), 0.2)
+	tween.tween_property(sprite, "modulate", Color.WHITE, 0.4)
+
+func _play_skill_anim(attacker_name: String, target_name: String):
+	var attacker = char_sprites.get(attacker_name)
+	if not attacker:
+		return
+	# Scale up briefly (power up)
+	var tween = create_tween()
+	tween.tween_property(attacker, "scale", attacker.scale * 1.15, 0.15)
+	tween.tween_property(attacker, "modulate", Color(1.2, 1.2, 1.5), 0.1)
+	tween.tween_callback(_play_hit_anim.bind(target_name))
+	tween.tween_property(attacker, "scale", attacker.scale, 0.2)
+	tween.tween_property(attacker, "modulate", Color.WHITE, 0.2)
 
 func _update_all_ui():
 	_update_player_panels()
@@ -165,9 +209,12 @@ func _update_atb_bars():
 
 func _on_unit_ready(unit: BattleUnit):
 	_update_all_ui()
-	# Highlight active character
-	if char_renderers.has(unit.unit_name):
-		char_renderers[unit.unit_name].has_aura = true
+	# Highlight active unit
+	var sprite = char_sprites.get(unit.unit_name)
+	if sprite:
+		var tween = create_tween().set_loops(3)
+		tween.tween_property(sprite, "modulate", Color(1.3, 1.3, 1.0), 0.2)
+		tween.tween_property(sprite, "modulate", Color.WHITE, 0.2)
 	
 	$UI/ActionPanel.visible = true
 	$UI/ActionPanel/UnitLabel.text = "【%s 的回合】" % unit.unit_name
@@ -202,20 +249,19 @@ func _on_skill_pressed(idx: int):
 	if idx < unit.skills.size():
 		selected_skill = unit.skills[idx]
 		if selected_skill.target_type == SkillData.TargetType.SELF:
-			_play_action_anim(unit, unit, selected_skill)
+			_play_heal_anim(unit.unit_name)
 			battle_manager.execute_skill(unit, selected_skill, unit)
 			$UI/ActionPanel.visible = false
 			_update_all_ui()
 		elif selected_skill.target_type == SkillData.TargetType.ALL_ENEMIES:
 			var enemies = enemy_units.filter(func(u): return not u.is_dead)
 			if not enemies.is_empty():
-				_play_action_anim(unit, enemies[0], selected_skill)
 				for e in enemies:
-					if char_renderers.has(e.unit_name):
-						char_renderers[e.unit_name].play_hit()
+					_play_skill_anim(unit.unit_name, e.unit_name)
 				battle_manager.execute_skill(unit, selected_skill, enemies[0])
 			$UI/ActionPanel.visible = false
 			_update_all_ui()
+			_check_defeated()
 		else:
 			_show_target_selection()
 
@@ -223,10 +269,8 @@ func _show_target_selection():
 	$UI/ActionPanel.visible = false
 	$UI/TargetPanel.visible = true
 	selecting_target = true
-
 	for child in $UI/TargetPanel/Targets.get_children():
 		child.queue_free()
-
 	var alive_enemies = enemy_units.filter(func(u): return not u.is_dead)
 	for i in range(alive_enemies.size()):
 		var btn = Button.new()
@@ -240,38 +284,27 @@ func _on_target_selected(target: BattleUnit):
 	selecting_target = false
 	var unit = battle_manager.current_unit
 	
-	# Play animations
-	_play_action_anim(unit, target, selected_skill)
-	
 	if selected_skill:
+		_play_skill_anim(unit.unit_name, target.unit_name)
 		battle_manager.execute_skill(unit, selected_skill, target)
 	else:
+		_play_attack_anim(unit.unit_name, target.unit_name)
 		battle_manager.execute_attack(unit, target)
 	_update_all_ui()
+	_check_defeated()
 
-func _play_action_anim(attacker: BattleUnit, target: BattleUnit, skill: SkillData):
-	# Attacker animation
-	if char_renderers.has(attacker.unit_name):
-		char_renderers[attacker.unit_name].play_attack()
-	
-	# Target animation (after small delay)
-	await get_tree().create_timer(0.2).timeout
-	if char_renderers.has(target.unit_name):
-		if target.is_dead:
-			char_renderers[target.unit_name].play_defeated()
-		else:
-			char_renderers[target.unit_name].play_hit()
+func _check_defeated():
+	for u in player_units + enemy_units:
+		if u.is_dead and char_sprites.has(u.unit_name):
+			var sprite = char_sprites[u.unit_name]
+			if sprite.modulate.a > 0.5:
+				_play_defeated_anim(u.unit_name)
 
 func _on_battle_log(text: String):
 	$UI/LogPanel/Log.text += text + "\n"
 	await get_tree().process_frame
 	$UI/LogPanel/Log.scroll_vertical = $UI/LogPanel/Log.get_v_scroll_bar().max_value
-	
-	# Check for defeated units and update sprites
-	for u in player_units + enemy_units:
-		if u.is_dead and char_renderers.has(u.unit_name):
-			if char_renderers[u.unit_name].current_pose != CharacterRenderer.Pose.DEFEATED:
-				char_renderers[u.unit_name].play_defeated()
+	_check_defeated()
 
 func _on_battle_ended(won: bool):
 	$UI/ActionPanel.visible = false

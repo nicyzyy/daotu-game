@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://scripts/battle_ui.gd" id="1_ui"]
 [ext_resource type="Script" path="res://scripts/battle_manager.gd" id="2_mgr"]
 [ext_resource type="Theme" path="res://theme.tres" id="3_theme"]
-[ext_resource type="Script" path="res://scripts/battle_background.gd" id="4_bg"]
+[ext_resource type="Texture2D" path="res://assets/sprites/battle_bg.png" id="4_bg_tex"]
 
 [node name="BattleScene" type="Control"]
 layout_mode = 3
@@ -20,8 +20,10 @@ script = ExtResource("2_mgr")
 
 [node name="BattleField" type="Node2D" parent="."]
 
-[node name="Background" type="Node2D" parent="BattleField"]
-script = ExtResource("4_bg")
+[node name="Background" type="Sprite2D" parent="BattleField"]
+texture = ExtResource("4_bg_tex")
+centered = false
+scale = Vector2(0.91, 0.94)
 
 [node name="CharacterLayer" type="Node2D" parent="BattleField"]
 
