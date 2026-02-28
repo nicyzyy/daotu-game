@@ -1,0 +1,12 @@
+{
+  "name": "daotu-game",
+  "version": "0.1.0",
+  "description": "道途 - 修仙RPG Demo",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
